@@ -1,0 +1,198 @@
+// Prisma schema for AI Applicant Selection Platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Org {
+  id            String   @id @default(uuid())
+  name          String
+  subdomain     String?  @unique
+  settings      Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  recruiters    Recruiter[]
+  jobs          Job[]
+  questionPools QuestionPool[]
+}
+
+model Recruiter {
+  id           String   @id @default(uuid())
+  orgId        String
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("recruiter") // "admin", "recruiter"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  org      Org        @relation(fields: [orgId], references: [id])
+  feedback Feedback[]
+
+  @@index([orgId])
+  @@index([email])
+}
+
+model Job {
+  id              String   @id @default(uuid())
+  orgId           String
+  title           String
+  description     String
+  criteriaJson    Json? // skills, experience, education requirements
+  weightsJson     Json? // weights for each factor
+  passMark        Float    @default(70.0)
+  status          String   @default("active") // "active", "closed"
+  shareableUrl    String?  @unique // Public application URL
+  applicationForm Json? // Custom form fields
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  org            Org              @relation(fields: [orgId], references: [id])
+  applicants     Applicant[]
+  assessments    Assessment[]
+  scores         Score[]
+  jobAssessments JobAssessment[]
+
+  @@index([orgId])
+  @@index([status])
+  @@index([shareableUrl])
+}
+
+model Applicant {
+  id         String   @id @default(uuid())
+  jobId      String
+  name       String
+  email      String
+  phone      String?
+  fieldsJson Json? // custom form fields
+  cvUrl      String?
+  cvFilename String?
+  status     String   @default("received") // "received", "processing", "scored"
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  job         Job          @relation(fields: [jobId], references: [id])
+  assessments Assessment[]
+  scores      Score[]
+
+  @@index([jobId])
+  @@index([email])
+}
+
+model Assessment {
+  id          String    @id @default(uuid())
+  jobId       String
+  applicantId String
+  type        String // "mcq", "coding", "video"
+  answersJson Json?
+  score       Float?
+  status      String    @default("pending") // "pending", "started", "completed"
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  job       Job       @relation(fields: [jobId], references: [id])
+  applicant Applicant @relation(fields: [applicantId], references: [id])
+
+  @@index([applicantId])
+  @@index([jobId])
+}
+
+model Score {
+  id              String   @id @default(uuid())
+  applicantId     String
+  jobId           String
+  compositeScore  Float // Rule-based score
+  mlProb          Float? // ML probability (0-1)
+  finalScore      Float // Hybrid final score
+  percentile      Float?
+  rank            Int?
+  breakdownJson   Json // Detailed feature scores
+  status          String   @default("pending") // "pending", "approved", "rejected"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  applicant Applicant  @relation(fields: [applicantId], references: [id])
+  job       Job        @relation(fields: [jobId], references: [id])
+  feedback  Feedback[]
+
+  @@unique([applicantId, jobId])
+  @@index([jobId])
+  @@index([finalScore])
+}
+
+model Feedback {
+  id          String   @id @default(uuid())
+  scoreId     String
+  recruiterId String
+  action      String // "override", "approve", "reject", "shortlist"
+  note        String?
+  createdAt   DateTime @default(now())
+
+  score     Score     @relation(fields: [scoreId], references: [id])
+  recruiter Recruiter @relation(fields: [recruiterId], references: [id])
+
+  @@index([scoreId])
+  @@index([recruiterId])
+}
+
+model WebhookEvent {
+  id          String   @id @default(uuid())
+  jobId       String?
+  type        String // "rank_update", "shortlist", "applicant_received"
+  payloadJson Json
+  status      String   @default("pending") // "pending", "sent", "failed"
+  attempts    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([type])
+}
+
+model QuestionPool {
+  id            String   @id @default(uuid())
+  category      String // "technical", "behavioral", "role-specific"
+  role          String? // "developer", "sales", "marketing", etc.
+  name          String
+  description   String?
+  questionsJson Json // Array of questions with answers
+  isDefault     Boolean  @default(true) // Platform-provided vs custom
+  orgId         String? // null for platform defaults, orgId for custom
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  org            Org?             @relation(fields: [orgId], references: [id])
+  jobAssessments JobAssessment[]
+
+  @@index([category])
+  @@index([role])
+  @@index([orgId])
+}
+
+model JobAssessment {
+  id              String   @id @default(uuid())
+  jobId           String
+  questionPoolId  String?
+  customQuestions Json? // Custom questions if not using pool
+  isRequired      Boolean  @default(false)
+  timeLimit       Int?     // Minutes
+  passMark        Float    @default(60.0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  job          Job           @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  questionPool QuestionPool? @relation(fields: [questionPoolId], references: [id])
+
+  @@index([jobId])
+  @@index([questionPoolId])
+}
+
+
