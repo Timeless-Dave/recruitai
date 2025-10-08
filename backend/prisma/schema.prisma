@@ -195,4 +195,20 @@ model JobAssessment {
   @@index([questionPoolId])
 }
 
+model Notification {
+  id          String   @id @default(uuid())
+  userId      String // Can be recruiter or applicant ID
+  type        String // "new_applicant", "status_update", "new_job", "interview", etc.
+  title       String
+  message     String
+  link        String? // Optional link to navigate to
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
 

@@ -19,6 +19,7 @@ import applicantRoutes from './routes/applicants.js';
 import assessmentRoutes from './routes/assessments.js';
 import feedbackRoutes from './routes/feedback.js';
 import webhookRoutes from './routes/webhooks.js';
+import notificationRoutes from './routes/notifications.js';
 
 // Import middleware
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
@@ -69,6 +70,7 @@ app.use('/api/applicants', applicantRoutes);
 app.use('/api/assessments', assessmentRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/webhooks', webhookRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // WebSocket connection
 io.on('connection', (socket) => {

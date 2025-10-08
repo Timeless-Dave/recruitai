@@ -4,11 +4,12 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/auth-context'
 import { DashboardHeader } from './dashboard-header'
+import { DashboardSidebar } from './dashboard-sidebar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { Briefcase, Clock, CheckCircle, TrendingUp } from 'lucide-react'
+import { Briefcase, Clock, CheckCircle, TrendingUp, Menu } from 'lucide-react'
 import { makeAuthenticatedRequest } from '@/lib/firebase'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -28,6 +29,8 @@ export function ApplicantDashboard() {
   const { userData } = useAuth()
   const [applications, setApplications] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
 
   useEffect(() => {
     fetchApplications()
@@ -76,57 +79,77 @@ export function ApplicantDashboard() {
   return (
     <div className="min-h-screen">
       <DashboardHeader />
+      <DashboardSidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
       
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
-        >
-          <h1 className="text-3xl sm:text-4xl font-bold mb-2">
-            Hello, <span className="gradient-text">{userData?.name}</span>
-          </h1>
-          <p className="text-muted-foreground">
-            Track your applications and view results
-          </p>
-        </motion.div>
+      {/* Mobile menu button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => setMobileSidebarOpen(true)}
+        className="md:hidden fixed bottom-4 right-4 z-30 h-14 w-14 rounded-full bg-gradient-to-r from-[#03b2cb] to-[#00999e] hover:opacity-90 active:scale-95 shadow-lg transition-transform touch-target"
+      >
+        <Menu className="h-6 w-6 text-white" />
+      </Button>
 
-        {/* Stats Overview */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
-        >
+      {/* Mobile sidebar */}
+      <DashboardSidebar isOpen={mobileSidebarOpen} setIsOpen={setMobileSidebarOpen} isMobile={true} />
+      
+      <main 
+        className={`transition-all duration-300 pt-16 ${sidebarOpen ? 'md:ml-[240px]' : 'md:ml-[80px]'}`}
+      >
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Welcome Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 sm:mb-8"
+          >
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">
+              Hello, <span className="gradient-text">{userData?.name}</span>
+            </h1>
+            <p className="text-sm sm:text-base text-muted-foreground">
+              Track your applications and view results
+            </p>
+          </motion.div>
+
+          {/* Stats Overview */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8"
+          >
           {[
             { label: 'Total Applications', value: applications.length, icon: Briefcase },
             { label: 'In Review', value: applications.filter(a => a.status === 'processing').length, icon: Clock },
             { label: 'Shortlisted', value: applications.filter(a => a.status === 'shortlisted').length, icon: CheckCircle },
           ].map((stat, index) => (
-            <Card key={stat.label} className="glass-effect border-white/10">
-              <CardContent className="p-6">
+            <Card key={stat.label} className="glass-effect border-white/10 hover:border-[#03b2cb]/40 transition-all group relative overflow-hidden">
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                <div className="absolute inset-0 bg-gradient-to-br from-[#03b2cb]/10 to-[#00999e]/10" />
+              </div>
+              <CardContent className="p-4 sm:p-6 relative z-10">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground mb-1">{stat.label}</p>
-                    <h3 className="text-3xl font-bold">{stat.value}</h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-1">{stat.label}</p>
+                    <h3 className="text-2xl sm:text-3xl font-bold">{stat.value}</h3>
                   </div>
-                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#03b2cb] to-[#00999e] flex items-center justify-center">
-                    <stat.icon className="h-6 w-6 text-white" />
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-gradient-to-br from-[#03b2cb] to-[#00999e] flex items-center justify-center shrink-0">
+                    <stat.icon className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                   </div>
                 </div>
               </CardContent>
             </Card>
           ))}
-        </motion.div>
+          </motion.div>
 
-        {/* Applications List */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <h2 className="text-2xl font-bold mb-6">Your Applications</h2>
+          {/* Applications List */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <h2 className="text-2xl font-bold mb-6">Your Applications</h2>
 
           {loading ? (
             <div className="space-y-4">
@@ -213,7 +236,8 @@ export function ApplicantDashboard() {
               ))}
             </div>
           )}
-        </motion.div>
+          </motion.div>
+        </div>
       </main>
     </div>
   )

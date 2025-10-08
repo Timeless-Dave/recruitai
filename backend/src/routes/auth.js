@@ -190,12 +190,14 @@ router.get('/recruiter/dashboard', async (req, res) => {
     }
 
     // Fetch dashboard stats
-    const [totalJobs, activeJobs, applicantsData] = await Promise.all([
+    const [totalJobs, activeJobs, totalApplicants, scoresData] = await Promise.all([
       prisma.job.count({ where: { orgId: recruiter.orgId } }),
       prisma.job.count({ where: { orgId: recruiter.orgId, status: 'active' } }),
-      prisma.applicant.aggregate({
+      prisma.applicant.count({
+        where: { job: { orgId: recruiter.orgId } }
+      }),
+      prisma.score.aggregate({
         where: { job: { orgId: recruiter.orgId } },
-        _count: true,
         _avg: { finalScore: true }
       })
     ]);
@@ -208,7 +210,7 @@ router.get('/recruiter/dashboard', async (req, res) => {
         _count: {
           select: { applicants: true }
         },
-        applicants: {
+        scores: {
           select: { finalScore: true }
         }
       }
@@ -221,21 +223,108 @@ router.get('/recruiter/dashboard', async (req, res) => {
       status: job.status || 'active',
       applicants: job._count.applicants,
       createdAt: job.createdAt,
-      avgScore: job.applicants.length > 0
-        ? Math.round(job.applicants.reduce((sum, a) => sum + (a.finalScore || 0), 0) / job.applicants.length)
+      avgScore: job.scores.length > 0
+        ? Math.round(job.scores.reduce((sum, s) => sum + (s.finalScore || 0), 0) / job.scores.length)
         : null
     }));
 
     res.json({
       totalJobs,
       activeJobs,
-      totalApplicants: applicantsData._count || 0,
-      avgScore: Math.round(applicantsData._avg.finalScore || 0),
+      totalApplicants,
+      avgScore: Math.round(scoresData._avg.finalScore || 0),
       recentJobs: formattedJobs
     });
   } catch (error) {
     console.error('Dashboard error:', error);
     res.status(500).json({ error: 'Failed to fetch dashboard data' });
+  }
+});
+
+// Analytics endpoint
+router.get('/analytics', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const decodedToken = await firebaseAuth.verifyIdToken(token);
+    const { email } = decodedToken;
+
+    const recruiter = await prisma.recruiter.findUnique({ where: { email } });
+    if (!recruiter) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Fetch analytics data
+    const [totalApplications, applicantsData, scoresData] = await Promise.all([
+      prisma.applicant.count({
+        where: { job: { orgId: recruiter.orgId } }
+      }),
+      prisma.applicant.groupBy({
+        by: ['status'],
+        where: { job: { orgId: recruiter.orgId } },
+        _count: true
+      }),
+      prisma.score.aggregate({
+        where: { job: { orgId: recruiter.orgId } },
+        _avg: { finalScore: true }
+      })
+    ]);
+
+    // Calculate success rate (shortlisted/hired percentage)
+    const scoredApplicants = await prisma.score.count({
+      where: { 
+        job: { orgId: recruiter.orgId },
+        status: { in: ['approved', 'shortlisted'] }
+      }
+    });
+    const successRate = totalApplications > 0 
+      ? Math.round((scoredApplicants / totalApplications) * 100)
+      : 0;
+
+    // Calculate average processing time (days)
+    const applicantsWithTime = await prisma.applicant.findMany({
+      where: { 
+        job: { orgId: recruiter.orgId },
+        updatedAt: { not: null }
+      },
+      select: {
+        createdAt: true,
+        updatedAt: true
+      },
+      take: 100
+    });
+
+    const avgProcessingTime = applicantsWithTime.length > 0
+      ? Math.round(
+          applicantsWithTime.reduce((sum, a) => {
+            const diff = new Date(a.updatedAt).getTime() - new Date(a.createdAt).getTime();
+            return sum + (diff / (1000 * 60 * 60 * 24)); // Convert to days
+          }, 0) / applicantsWithTime.length
+        )
+      : 0;
+
+    // Get top skills (mock data for now - would need to parse CVs in production)
+    const topSkills = [
+      { name: 'JavaScript/TypeScript', count: Math.floor(totalApplications * 0.37) },
+      { name: 'React/Next.js', count: Math.floor(totalApplications * 0.32) },
+      { name: 'Node.js', count: Math.floor(totalApplications * 0.27) },
+      { name: 'Python', count: Math.floor(totalApplications * 0.23) },
+      { name: 'AWS/Cloud', count: Math.floor(totalApplications * 0.20) },
+    ];
+
+    res.json({
+      totalApplications,
+      avgProcessingTime,
+      successRate,
+      topSkills
+    });
+  } catch (error) {
+    console.error('Analytics error:', error);
+    res.status(500).json({ error: 'Failed to fetch analytics data' });
   }
 });
 
