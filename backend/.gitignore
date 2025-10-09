@@ -29,8 +29,7 @@ Thumbs.db
 *~
 
 # Prisma
-prisma/migrations/
-!prisma/migrations/.gitkeep
+# Note: migrations folder MUST be committed for production deployments
 
 # Build
 dist/
