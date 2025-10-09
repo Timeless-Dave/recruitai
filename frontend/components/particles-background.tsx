@@ -106,5 +106,5 @@ export function ParticlesBackground() {
     return () => window.removeEventListener("resize", handleResize)
   }, [])
 
-  return <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none opacity-40" />
+  return <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none opacity-40 will-change-transform" style={{ transform: 'translateZ(0)' }} />
 }

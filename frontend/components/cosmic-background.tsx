@@ -4,7 +4,7 @@ import { motion } from "framer-motion"
 
 export function CosmicBackground() {
   return (
-    <div className="fixed inset-0 -z-10 overflow-hidden">
+    <div className="fixed inset-0 -z-10 overflow-hidden will-change-transform" style={{ transform: 'translateZ(0)' }}>
       {/* Deep space gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a1a] via-[#050510] to-black" />
       

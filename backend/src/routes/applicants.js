@@ -7,8 +7,11 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 import { storage } from '../config/firebase.js';
 import { isValidFileType, isValidFileSize, parsePaginationParams, buildPaginationResponse } from '../utils/helpers.js';
 import { Queue } from 'bullmq';
+import scoringService from '../services/scoringService.js';
 
 const router = express.Router();
+
+const backgroundJobsDisabled = process.env.DISABLE_BACKGROUND_JOBS === 'true';
 
 // Configure multer for file upload
 const upload = multer({
@@ -25,14 +28,16 @@ const upload = multer({
   }
 });
 
-// Initialize scoring queue
-const scoringQueue = new Queue('scoring-queue', {
-  connection: {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT) || 6379,
-    password: process.env.REDIS_PASSWORD
-  }
-});
+// Initialize scoring queue only if jobs enabled
+const scoringQueue = backgroundJobsDisabled
+  ? null
+  : new Queue('scoring-queue', {
+      connection: {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT) || 6379,
+        password: process.env.REDIS_PASSWORD
+      }
+    });
 
 /**
  * Public: Submit application (no auth required)
@@ -162,14 +167,18 @@ router.post(
       });
     }
 
-    // Enqueue for background processing
+    // Enqueue for background processing or process immediately
     try {
-      await scoringQueue.add('processApplicant', {
-        applicantId: applicant.id
-      });
+      if (backgroundJobsDisabled) {
+        const result = await scoringService.processApplicant(applicant.id);
+        // Optionally update status here if needed, e.g. 'scored'
+        // await prisma.applicant.update({ where: { id: applicant.id }, data: { status: 'scored' } });
+      } else {
+        await scoringQueue.add('processApplicant', { applicantId: applicant.id });
+      }
     } catch (queueError) {
-      console.error('Queue error:', queueError);
-      // Continue even if queuing fails - can process manually later
+      console.error('Queue/processing error:', queueError);
+      // Continue even if queuing/processing fails
     }
 
     res.status(201).json({

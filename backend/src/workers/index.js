@@ -3,6 +3,11 @@ import scoringService from '../services/scoringService.js';
 import { logger } from '../utils/logger.js';
 import { io } from '../server.js';
 
+if (process.env.DISABLE_BACKGROUND_JOBS === 'true') {
+  logger.info('[Worker] Background jobs disabled - exiting worker.');
+  process.exit(0);
+}
+
 const connection = {
   host: process.env.REDIS_HOST || 'localhost',
   port: parseInt(process.env.REDIS_PORT) || 6379,
