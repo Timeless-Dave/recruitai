@@ -11,6 +11,119 @@ import scoringService from '../services/scoringService.js';
 
 const router = express.Router();
 
+/**
+ * Public: Submit application with resume URL (no auth required)
+ * POST /api/applicants
+ */
+router.post(
+  '/',
+  [
+    body('jobId').notEmpty().trim(),
+    body('fullName').notEmpty().trim(),
+    body('email').isEmail().normalizeEmail(),
+    body('phone').optional().trim(),
+    body('resumeUrl').notEmpty().isURL(),
+    body('linkedinUrl').optional().isURL(),
+    body('portfolioUrl').optional().isURL(),
+    body('coverLetter').optional().trim(),
+  ],
+  asyncHandler(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { 
+      jobId, 
+      fullName, 
+      email, 
+      phone, 
+      resumeUrl, 
+      linkedinUrl, 
+      portfolioUrl, 
+      coverLetter 
+    } = req.body;
+
+    // Find job
+    const job = await prisma.job.findUnique({
+      where: { id: jobId },
+      include: {
+        jobAssessments: true
+      }
+    });
+
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    if (job.status !== 'active') {
+      return res.status(400).json({ error: 'This job is no longer accepting applications' });
+    }
+
+    // Check for duplicate application
+    const existingApplicant = await prisma.applicant.findFirst({
+      where: {
+        jobId: job.id,
+        email
+      }
+    });
+
+    if (existingApplicant) {
+      return res.status(409).json({ 
+        error: 'You have already applied for this position',
+        applicantId: existingApplicant.id
+      });
+    }
+
+    // Create applicant
+    const applicant = await prisma.applicant.create({
+      data: {
+        jobId: job.id,
+        name: fullName,
+        email,
+        phone: phone || null,
+        resumeUrl,
+        linkedinUrl: linkedinUrl || null,
+        portfolioUrl: portfolioUrl || null,
+        coverLetter: coverLetter || null,
+        status: 'received'
+      }
+    });
+
+    // Create assessment record if job has assessment
+    if (job.jobAssessments && job.jobAssessments.length > 0) {
+      await prisma.assessment.create({
+        data: {
+          applicantId: applicant.id,
+          jobId: job.id,
+          type: 'mcq',
+          status: 'pending'
+        }
+      });
+    }
+
+    // Enqueue for background processing or process immediately
+    try {
+      if (backgroundJobsDisabled) {
+        const result = await scoringService.processApplicant(applicant.id);
+      } else {
+        await scoringQueue.add('processApplicant', { applicantId: applicant.id });
+      }
+    } catch (queueError) {
+      console.error('Queue/processing error:', queueError);
+      // Continue even if queuing/processing fails
+    }
+
+    res.status(201).json({
+      message: 'Application submitted successfully',
+      applicantId: applicant.id,
+      hasAssessment: job.jobAssessments && job.jobAssessments.length > 0,
+      assessmentRequired: job.jobAssessments?.[0]?.isRequired || false
+    });
+  })
+);
+
+
 const backgroundJobsDisabled = process.env.DISABLE_BACKGROUND_JOBS === 'true';
 
 // Configure multer for file upload

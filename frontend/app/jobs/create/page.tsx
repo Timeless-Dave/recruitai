@@ -23,6 +23,13 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { 
   Briefcase, 
   MapPin, 
@@ -34,16 +41,23 @@ import {
   Save,
   FileText,
   Target,
-  Sparkles
+  Sparkles,
+  CheckCircle,
+  Copy,
+  Share2
 } from 'lucide-react'
 import { makeAuthenticatedRequest } from '@/lib/firebase'
+import { useToast } from '@/hooks/use-toast'
 
 export default function CreateJobPage() {
   const { user, userData, loading: authLoading } = useAuth()
   const router = useRouter()
+  const { toast } = useToast()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [createdJob, setCreatedJob] = useState<any>(null)
 
   // Form state
   const [jobTitle, setJobTitle] = useState('')
@@ -115,13 +129,41 @@ export default function CreateJobPage() {
       )
 
       if (response.ok) {
-        router.push('/jobs')
+        const data = await response.json()
+        setCreatedJob(data)
+        setShowSuccessDialog(true)
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to create job. Please try again.',
+          variant: 'destructive',
+        })
       }
     } catch (error) {
       console.error('Failed to create job:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to create job. Please try again.',
+        variant: 'destructive',
+      })
     } finally {
       setSaving(false)
     }
+  }
+
+  const copyShareableLink = () => {
+    if (createdJob?.shareableUrl) {
+      navigator.clipboard.writeText(createdJob.shareableUrl)
+      toast({
+        title: 'Link copied!',
+        description: 'Shareable link copied to clipboard',
+      })
+    }
+  }
+
+  const handleDialogClose = () => {
+    setShowSuccessDialog(false)
+    router.push('/jobs')
   }
 
   if (authLoading || !userData) {
@@ -433,6 +475,65 @@ export default function CreateJobPage() {
           </div>
         </main>
       </div>
+
+      {/* Success Dialog */}
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className="glass-effect border-white/10 sm:max-w-lg">
+          <DialogHeader>
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#03b2cb]/20 to-[#00999e]/20 flex items-center justify-center">
+                <CheckCircle className="h-8 w-8 text-[#03b2cb]" />
+              </div>
+            </div>
+            <DialogTitle className="text-center text-2xl">
+              Job Created Successfully!
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              Your job posting is now live and accepting applications
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Shareable Job Link</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={createdJob?.shareableUrl || ''}
+                  readOnly
+                  className="glass-effect border-white/10 font-mono text-sm"
+                />
+                <Button
+                  size="icon"
+                  onClick={copyShareableLink}
+                  className="shrink-0 bg-gradient-to-r from-[#03b2cb] to-[#00999e]"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Share this link with candidates to receive applications
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-4">
+              <Button
+                onClick={copyShareableLink}
+                variant="outline"
+                className="flex-1 border-white/10 hover:bg-white/5"
+              >
+                <Share2 className="h-4 w-4 mr-2" />
+                Copy Link
+              </Button>
+              <Button
+                onClick={handleDialogClose}
+                className="flex-1 bg-gradient-to-r from-[#03b2cb] to-[#00999e]"
+              >
+                View All Jobs
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -13,9 +13,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Plus, Search, Filter, Users, Calendar, Menu, Eye, Edit, Trash2, MoreVertical } from 'lucide-react'
+import { Plus, Search, Filter, Users, Calendar, Menu, Eye, Edit, Trash2, MoreVertical, Share2, Copy } from 'lucide-react'
 import { makeAuthenticatedRequest } from '@/lib/firebase'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useToast } from '@/hooks/use-toast'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,11 +32,13 @@ interface Job {
   createdAt: string
   avgScore?: number
   description?: string
+  shareableUrl?: string
 }
 
 export default function JobsPage() {
   const { user, userData, loading: authLoading } = useAuth()
   const router = useRouter()
+  const { toast } = useToast()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [jobs, setJobs] = useState<Job[]>([])
@@ -61,12 +64,31 @@ export default function JobsPage() {
         `${process.env.NEXT_PUBLIC_API_URL}/api/jobs`
       )
       const data = await response.json()
-      setJobs(data.jobs || [])
+      // Transform the data to match our interface
+      const transformedJobs = (data.jobs || data.data || []).map((job: any) => ({
+        id: job.id,
+        title: job.title,
+        status: job.status,
+        applicants: job._count?.applicants || job.applicants || 0,
+        createdAt: job.createdAt,
+        avgScore: job.avgScore,
+        description: job.description,
+        shareableUrl: job.shareableUrl,
+      }))
+      setJobs(transformedJobs)
     } catch (error) {
       console.error('Failed to fetch jobs:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+  const copyJobLink = (shareableUrl: string) => {
+    navigator.clipboard.writeText(shareableUrl)
+    toast({
+      title: 'Link copied!',
+      description: 'Job link copied to clipboard',
+    })
   }
 
   const filteredJobs = jobs.filter(job => {
@@ -248,6 +270,12 @@ export default function JobsPage() {
                                 <Eye className="h-4 w-4 mr-2" />
                                 View Details
                               </DropdownMenuItem>
+                              {job.shareableUrl && (
+                                <DropdownMenuItem onClick={() => copyJobLink(job.shareableUrl!)}>
+                                  <Copy className="h-4 w-4 mr-2" />
+                                  Copy Job Link
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => router.push(`/jobs/${job.id}/edit`)}>
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit

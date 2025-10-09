@@ -11,6 +11,99 @@ import { generateShareableId, generateApplicationUrl, parsePaginationParams, bui
 const router = express.Router();
 
 /**
+ * Get public job listings (no auth required)
+ * GET /api/jobs/public
+ */
+router.get(
+  '/public',
+  asyncHandler(async (req, res) => {
+    const { page, limit, skip } = parsePaginationParams(req.query);
+    const { search, type, experienceLevel, location } = req.query;
+
+    const where = {
+      status: 'active',
+      ...(search && {
+        OR: [
+          { title: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } }
+        ]
+      }),
+      ...(type && { type }),
+      ...(experienceLevel && { experienceLevel }),
+      ...(location && { location: { contains: location, mode: 'insensitive' } })
+    };
+
+    const [jobs, total] = await Promise.all([
+      prisma.job.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          location: true,
+          type: true,
+          experienceLevel: true,
+          department: true,
+          shareableUrl: true,
+          createdAt: true,
+          _count: {
+            select: {
+              applicants: true
+            }
+          }
+        }
+      }),
+      prisma.job.count({ where })
+    ]);
+
+    res.json(buildPaginationResponse(jobs, total, page, limit));
+  })
+);
+
+/**
+ * Get single public job by shareable URL (no auth required)
+ * GET /api/jobs/public/:shareableId
+ */
+router.get(
+  '/public/:shareableId',
+  asyncHandler(async (req, res) => {
+    const job = await prisma.job.findFirst({
+      where: {
+        shareableUrl: {
+          contains: req.params.shareableId
+        },
+        status: 'active'
+      },
+      include: {
+        jobAssessments: {
+          select: {
+            id: true,
+            isRequired: true,
+            timeLimit: true,
+            passMark: true,
+            customQuestions: true
+          }
+        },
+        _count: {
+          select: {
+            applicants: true
+          }
+        }
+      }
+    });
+
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found or no longer active' });
+    }
+
+    res.json(job);
+  })
+);
+
+/**
  * Create a new job
  * POST /api/jobs
  */
@@ -20,6 +113,14 @@ router.post(
   [
     body('title').notEmpty().trim(),
     body('description').notEmpty().trim(),
+    body('location').optional().trim(),
+    body('type').optional().isIn(['full-time', 'part-time', 'contract', 'internship']),
+    body('experienceLevel').optional().isIn(['entry', 'mid', 'senior', 'lead']),
+    body('department').optional().trim(),
+    body('responsibilities').optional().trim(),
+    body('qualifications').optional().trim(),
+    body('requiredSkills').optional().isArray(),
+    body('salary').optional().isObject(),
     body('assessmentType').optional().isIn(['ai-generated', 'question-pool', 'custom', 'none']),
     body('questionPoolId').optional().isString(),
     body('customQuestions').optional().isArray(),
@@ -35,13 +136,22 @@ router.post(
     const {
       title,
       description,
+      location,
+      type,
+      experienceLevel,
+      department,
+      responsibilities,
+      qualifications,
+      requiredSkills,
+      salary,
       assessmentType = 'ai-generated',
       questionPoolId,
       customQuestions,
       criteriaJson,
       weightsJson,
       applicationForm,
-      passMark
+      passMark,
+      settings
     } = req.body;
 
     // Generate shareable URL
@@ -68,6 +178,14 @@ router.post(
         orgId: req.user.orgId,
         title,
         description,
+        location,
+        type,
+        experienceLevel,
+        department,
+        responsibilities,
+        qualifications,
+        requiredSkills,
+        salary,
         criteriaJson: finalCriteria,
         weightsJson: finalWeights,
         shareableUrl,

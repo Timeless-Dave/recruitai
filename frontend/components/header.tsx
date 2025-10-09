@@ -52,10 +52,16 @@ export function Header() {
     { label: "Features", href: "#features" },
     { label: "How It Works", href: "#how-it-works" },
     { label: "Testimonials", href: "#testimonials" },
+    { label: "Browse Jobs", href: "/jobs/browse", isRoute: true },
   ]
 
   // Smooth scroll handler
-  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string, isRoute?: boolean) => {
+    if (isRoute) {
+      // Let the link navigate normally for routes
+      return
+    }
+    
     e.preventDefault()
     const element = document.querySelector(href)
     if (element) {
@@ -146,11 +152,11 @@ export function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-8">
-            {navItems.map((item) => (
+            {navItems.map((item: any) => (
               <a
                 key={item.label}
                 href={item.href}
-                onClick={(e) => handleNavClick(e, item.href)}
+                onClick={(e) => handleNavClick(e, item.href, item.isRoute)}
                 className={`group text-sm font-medium transition-all duration-300 relative ${
                   activeId === item.href ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -191,7 +197,7 @@ export function Header() {
             exit={{ opacity: 0, height: 0 }}
             className="md:hidden py-4 space-y-4"
           >
-            {navItems.map((item) => (
+            {navItems.map((item: any) => (
               <a
                 key={item.label}
                 href={item.href}
@@ -199,7 +205,7 @@ export function Header() {
                   activeId === item.href ? "text-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
                 }`}
                 onClick={(e) => {
-                  handleNavClick(e, item.href)
+                  handleNavClick(e, item.href, item.isRoute)
                   setIsMobileMenuOpen(false)
                 }}
               >

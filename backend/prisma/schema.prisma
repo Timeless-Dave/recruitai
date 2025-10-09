@@ -40,18 +40,26 @@ model Recruiter {
 }
 
 model Job {
-  id              String   @id @default(uuid())
-  orgId           String
-  title           String
-  description     String
-  criteriaJson    Json? // skills, experience, education requirements
-  weightsJson     Json? // weights for each factor
-  passMark        Float    @default(70.0)
-  status          String   @default("active") // "active", "closed"
-  shareableUrl    String?  @unique // Public application URL
-  applicationForm Json? // Custom form fields
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id               String   @id @default(uuid())
+  orgId            String
+  title            String
+  description      String
+  location         String?
+  type             String?  // "full-time", "part-time", "contract", "internship"
+  experienceLevel  String?  // "entry", "mid", "senior", "lead"
+  department       String?
+  responsibilities String?  @db.Text
+  qualifications   String?  @db.Text
+  requiredSkills   Json?    // Array of skills
+  salary           Json?    // {min: number, max: number}
+  criteriaJson     Json?    // skills, experience, education requirements
+  weightsJson      Json?    // weights for each factor
+  passMark         Float    @default(70.0)
+  status           String   @default("active") // "active", "closed", "draft"
+  shareableUrl     String?  @unique // Public application URL
+  applicationForm  Json?    // Custom form fields
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   org            Org              @relation(fields: [orgId], references: [id])
   applicants     Applicant[]
@@ -65,17 +73,21 @@ model Job {
 }
 
 model Applicant {
-  id         String   @id @default(uuid())
-  jobId      String
-  name       String
-  email      String
-  phone      String?
-  fieldsJson Json? // custom form fields
-  cvUrl      String?
-  cvFilename String?
-  status     String   @default("received") // "received", "processing", "scored"
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id           String   @id @default(uuid())
+  jobId        String
+  name         String
+  email        String
+  phone        String?
+  fieldsJson   Json?    // custom form fields
+  cvUrl        String?
+  cvFilename   String?
+  resumeUrl    String?  // Resume link provided by applicant
+  linkedinUrl  String?
+  portfolioUrl String?
+  coverLetter  String?  @db.Text
+  status       String   @default("received") // "received", "processing", "scored"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   job         Job          @relation(fields: [jobId], references: [id])
   assessments Assessment[]
