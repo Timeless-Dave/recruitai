@@ -1,0 +1,23 @@
+{
+  "name": "RecruitAI - Smart Recruitment Platform",
+  "short_name": "RecruitAI",
+  "description": "AI-powered recruitment platform for intelligent applicant screening, fair ranking, and automated feedback",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#03b2cb",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}
+

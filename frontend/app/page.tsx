@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import { Header } from "@/components/header"
 import { HeroSection } from "@/components/hero-section"
 import { StatsSection } from "@/components/stats-section"
@@ -11,6 +12,47 @@ import { CosmicBackground } from "@/components/cosmic-background"
 import { ApplicantShowcase } from "@/components/applicant-showcase"
 import { ScrollProgress } from "@/components/scroll-progress"
 import { AuthModal } from "@/components/auth-modal"
+
+export const metadata: Metadata = {
+  title: "RecruitAI - Smart AI-Powered Recruitment Platform",
+  description:
+    "Transform hiring with AI-powered applicant screening, intelligent ranking, and automated feedback. Find top talent faster with our smart recruitment platform built for modern teams.",
+  keywords: [
+    "AI recruitment software",
+    "applicant tracking system",
+    "ATS platform",
+    "AI hiring tool",
+    "recruitment automation",
+    "talent acquisition software",
+    "smart hiring platform",
+    "AI candidate screening",
+    "automated recruitment",
+    "recruitment technology",
+  ],
+  openGraph: {
+    title: "RecruitAI - Smart AI-Powered Recruitment Platform",
+    description:
+      "Transform hiring with AI-powered applicant screening, intelligent ranking, and automated feedback. Find top talent faster.",
+    url: "https://recruitai.app",
+    siteName: "RecruitAI",
+    type: "website",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "RecruitAI - AI-Powered Recruitment Platform",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "RecruitAI - Smart AI-Powered Recruitment Platform",
+    description:
+      "Transform hiring with AI-powered applicant screening, intelligent ranking, and automated feedback.",
+    images: ["/og-image.png"],
+  },
+}
 
 export default function Home() {
   return (
