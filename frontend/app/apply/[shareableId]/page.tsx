@@ -144,6 +144,7 @@ export default function ApplyJobPage() {
       )
 
       if (response.ok) {
+        const data = await response.json()
         setShowSuccessDialog(true)
       } else {
         const error = await response.json()
@@ -511,26 +512,37 @@ export default function ApplyJobPage() {
               </div>
             </div>
             <DialogTitle className="text-center text-2xl">
-              Application Submitted!
+              Application Submitted Successfully!
             </DialogTitle>
-            <DialogDescription className="text-center">
-              Your application has been successfully submitted. We'll review it and get back to you soon.
+            <DialogDescription className="text-center space-y-3">
+              <p className="text-base">
+                Your application has been successfully submitted and our AI is already analyzing your profile.
+              </p>
+              <div className="bg-[#03b2cb]/10 border border-[#03b2cb]/20 rounded-lg p-4 mt-4">
+                <p className="text-sm font-medium text-foreground mb-2">
+                  📬 What happens next?
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  You will be contacted if you are shortlisted for the next stage, which may include an assessment or interview. 
+                  Create an account to track your application status and receive instant notifications!
+                </p>
+              </div>
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col gap-3 pt-4">
             <Button
-              onClick={() => router.push('/jobs/browse')}
+              onClick={() => router.push('/?action=signup&type=applicant')}
               className="w-full bg-gradient-to-r from-[#03b2cb] to-[#00999e]"
             >
-              Browse More Jobs
+              Create Account & Track Application
             </Button>
             <Button
-              onClick={() => setShowSuccessDialog(false)}
+              onClick={() => router.push('/jobs/browse')}
               variant="outline"
               className="w-full border-white/10 hover:bg-white/5"
             >
-              Close
+              Browse More Jobs
             </Button>
           </div>
         </DialogContent>

@@ -90,6 +90,30 @@ router.post(
       }
     });
 
+    // Create notification for recruiter(s) in the organization
+    try {
+      // Get all recruiters in the organization
+      const recruiters = await prisma.recruiter.findMany({
+        where: { orgId: job.orgId },
+        select: { id: true }
+      });
+
+      // Create notifications for all recruiters
+      await prisma.notification.createMany({
+        data: recruiters.map(recruiter => ({
+          userId: recruiter.id,
+          type: 'new_applicant',
+          title: 'New Application Received',
+          message: `${fullName} applied for ${job.title}`,
+          link: `/applicants?jobId=${job.id}`,
+          isRead: false
+        }))
+      });
+    } catch (notificationError) {
+      console.error('Failed to create notifications:', notificationError);
+      // Continue even if notification creation fails
+    }
+
     // Create assessment record if job has assessment
     if (job.jobAssessments && job.jobAssessments.length > 0) {
       await prisma.assessment.create({
@@ -118,7 +142,8 @@ router.post(
       message: 'Application submitted successfully',
       applicantId: applicant.id,
       hasAssessment: job.jobAssessments && job.jobAssessments.length > 0,
-      assessmentRequired: job.jobAssessments?.[0]?.isRequired || false
+      assessmentRequired: job.jobAssessments?.[0]?.isRequired || false,
+      nextSteps: 'You will be contacted if you are shortlisted for the next stage of the recruitment process.'
     });
   })
 );
