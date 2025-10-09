@@ -40,9 +40,15 @@ if (!fs.existsSync(logsDir)) {
 
 const app = express();
 const httpServer = createServer(app);
+
+// Parse allowed origins from comma-separated env var
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+  .split(',')
+  .map(o => o.trim());
+
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origin: allowedOrigins,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     credentials: true
   },
@@ -51,7 +57,17 @@ const io = new Server(httpServer, {
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      logger.warn(`CORS blocked origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
 app.use(express.json());
@@ -96,8 +112,8 @@ httpServer.listen(PORT, () => {
   logger.info('='.repeat(50));
   logger.info(`🚀 Recruit AI Backend Server Started`);
   logger.info(`📡 Server running on port ${PORT}`);
-  logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  logger.info(`🔗 CORS Origin: ${process.env.CORS_ORIGIN || 'http://localhost:3000'}`);
+  logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'production'}`);
+  logger.info(`🔗 CORS Origin: ${process.env.CORS_ORIGIN || 'https://recruitai-pzkdwps4y-timeless-daves-projects.vercel.app'}`);
   logger.info(`🔌 WebSocket: Enabled`);
   logger.info(`💾 Database: ${process.env.DATABASE_URL ? 'Connected' : 'Not configured'}`);
   logger.info(`🔥 Firebase: ${process.env.FIREBASE_PROJECT_ID ? 'Configured' : 'Not configured'}`);

@@ -36,53 +36,43 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 /**
  * Sign up with email and password
  */
-export async function signUpWithEmail(
-  email: string, 
-  password: string, 
-  name: string, 
-  company: string
-) {
+export async function signUpWithEmail(email: string, password: string, name: string, company: string) {
   try {
-    // 1. Create user in Firebase
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
-    
-    // 2. Get Firebase ID token
     const firebaseToken = await user.getIdToken();
-    
-    // 3. Register in your backend
-    const response = await fetch(`${API_URL}/api/auth/signup`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email,
-        password, // Still needed for validation
-        name,
-        orgName: company,
-        firebaseUid: user.uid,
-      }),
-    });
-    
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to create account in backend');
+
+    // Try backend signup, but don't block UX if it fails
+    let backendData: any = null;
+    try {
+      const resp = await fetch(`${API_URL}/api/auth/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, name, orgName: company, firebaseUid: user.uid }),
+      });
+      if (resp.ok) {
+        backendData = await resp.json();
+      }
+    } catch (_) {
+      // swallow; we’ll sync later
     }
-    
-    const backendData = await response.json();
-    
-    // 4. Store token
+
     localStorage.setItem('firebaseToken', firebaseToken);
-    localStorage.setItem('userData', JSON.stringify(backendData.user));
-    
+    if (backendData?.user) {
+      localStorage.setItem('userData', JSON.stringify(backendData.user));
+    }
     return { user, firebaseToken, backendData };
-  } catch (error: any) {
-    console.error('Sign up error:', error);
-    throw new Error(error.message || 'Failed to sign up');
+  } catch (err: any) {
+    if (err?.code === 'auth/email-already-in-use') {
+      throw new Error('This email is already registered. Please sign in instead.');
+    }
+    throw new Error(err?.message || 'Failed to sign up');
   }
 }
 
 /**
  * Sign in with email and password
+ * With retry logic for backend cold starts
  */
 export async function signInWithEmail(email: string, password: string) {
   try {
@@ -90,19 +80,42 @@ export async function signInWithEmail(email: string, password: string) {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const firebaseToken = await userCredential.user.getIdToken();
     
-    // 2. Verify with your backend
-    const response = await fetch(`${API_URL}/api/auth/verify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ firebaseToken }),
-    });
+    // 2. Verify with backend (with retry for cold starts)
+    let response;
+    let retries = 0;
+    const maxRetries = 2;
     
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to verify with backend');
+    while (retries <= maxRetries) {
+      try {
+        response = await fetch(`${API_URL}/api/auth/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ firebaseToken }),
+        });
+        
+        if (response.ok) break; // Success
+        
+        // If failed and we have retries left, wait and retry
+        if (retries < maxRetries) {
+          console.log(`Backend verify failed, retrying in 2s (${retries + 1}/${maxRetries})...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          retries++;
+        } else {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to verify with backend');
+        }
+      } catch (fetchError: any) {
+        if (retries < maxRetries && (fetchError.message === 'Failed to fetch' || fetchError.name === 'TypeError')) {
+          console.log(`Backend unreachable, retrying in 2s (${retries + 1}/${maxRetries})...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          retries++;
+        } else {
+          throw fetchError;
+        }
+      }
     }
     
-    const userData = await response.json();
+    const userData = await response!.json();
     
     // 3. Store token and user data
     localStorage.setItem('firebaseToken', firebaseToken);
@@ -111,6 +124,18 @@ export async function signInWithEmail(email: string, password: string) {
     return { firebaseToken, userData };
   } catch (error: any) {
     console.error('Sign in error:', error);
+    
+    // Provide helpful error messages
+    if (error?.code === 'auth/wrong-password') {
+      throw new Error('Incorrect password. Please try again.');
+    }
+    if (error?.code === 'auth/user-not-found') {
+      throw new Error('No account found with this email. Please sign up.');
+    }
+    if (error?.code === 'auth/invalid-email') {
+      throw new Error('Please enter a valid email address.');
+    }
+    
     throw new Error(error.message || 'Failed to sign in');
   }
 }

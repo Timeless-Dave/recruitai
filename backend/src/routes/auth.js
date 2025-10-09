@@ -98,28 +98,45 @@ router.post(
       const decodedToken = await firebaseAuth.verifyIdToken(firebaseToken);
       const { email, uid } = decodedToken;
 
-      // Find user in our database
-      const recruiter = await prisma.recruiter.findUnique({ 
-        where: { email },
-        include: { org: true }
-      });
+    // Find user in our database
+    let recruiter = await prisma.recruiter.findUnique({ 
+      where: { email },
+      include: { org: true }
+    });
 
-      if (!recruiter) {
-        return res.status(404).json({ error: 'User not found. Please sign up first.' });
-      }
-
-      res.json({
-        message: 'Authentication successful',
-        user: {
-          id: recruiter.id,
-          email: recruiter.email,
-          name: recruiter.name,
-          orgId: recruiter.orgId,
-          orgName: recruiter.org.name,
-          role: recruiter.role,
-          firebaseUid: uid,
+    if (!recruiter) {
+      // Self-heal: create org and recruiter if missing
+      const fallbackName = (decodedToken.name || email.split('@')[0]).trim();
+      const orgName = req.headers['x-org-name']?.toString() || `${fallbackName}'s Org`;
+      const org = await prisma.org.create({
+        data: {
+          name: orgName,
+          recruiters: {
+            create: {
+              email,
+              name: fallbackName,
+              passwordHash: uid,
+              role: 'admin',
+            },
+          },
         },
+        include: { recruiters: true },
       });
+      recruiter = org.recruiters[0];
+    }
+
+    res.json({
+      message: 'Authentication successful',
+      user: {
+        id: recruiter.id,
+        email: recruiter.email,
+        name: recruiter.name,
+        orgId: recruiter.orgId,
+        orgName: recruiter.org?.name || '',
+        role: recruiter.role,
+        firebaseUid: uid,
+      },
+    });
     } catch (error) {
       console.error('Verification error:', error);
       res.status(401).json({ error: 'Invalid or expired token' });
@@ -144,16 +161,37 @@ router.post('/sync', async (req, res) => {
 
     // Verify Firebase token
     const decodedToken = await firebaseAuth.verifyIdToken(token);
-    const { email, uid } = decodedToken;
+    const { email, uid, name: firebaseName } = decodedToken;
 
     // Find user in our database
-    const recruiter = await prisma.recruiter.findUnique({
+    let recruiter = await prisma.recruiter.findUnique({
       where: { email },
       include: { org: true }
     });
 
+    // Self-heal: If Firebase user exists but no database record, create it
     if (!recruiter) {
-      return res.status(404).json({ error: 'User not found. Please complete signup.' });
+      console.log(`[Sync] Creating missing database record for Firebase user: ${email}`);
+      const fallbackName = (firebaseName || email.split('@')[0]).trim();
+      const orgName = `${fallbackName}'s Organization`;
+      
+      const org = await prisma.org.create({
+        data: {
+          name: orgName,
+          recruiters: {
+            create: {
+              email,
+              name: fallbackName,
+              passwordHash: uid,
+              role: 'admin',
+            },
+          },
+        },
+        include: { recruiters: true },
+      });
+      
+      recruiter = org.recruiters[0];
+      recruiter.org = org;
     }
 
     res.json({
