@@ -1,22 +1,26 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
 import { Mail, Lock, User, Briefcase, Loader2 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { signUpWithEmail, signInWithEmail, signInWithGoogle } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 
-type AuthStep = "choice" | "signin" | "signup-profile" | "signup-credentials" | "google-profile"
+type AuthStep = "choice" | "signin" | "signup-profile" | "signup-credentials" | "google-profile" | "account-type"
 
 export function AuthModal({ triggerId = "open-auth" }: { triggerId?: string }) {
+  const searchParams = useSearchParams()
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState<AuthStep>("choice")
   const [loading, setLoading] = useState(false)
   const [googleData, setGoogleData] = useState<any>(null)
+  const [accountType, setAccountType] = useState<"recruiter" | "applicant">("recruiter")
   const { toast } = useToast()
   const [formData, setFormData] = useState({
     email: "",
@@ -25,6 +29,23 @@ export function AuthModal({ triggerId = "open-auth" }: { triggerId?: string }) {
     company: "",
     role: "",
   })
+
+  // Check URL parameters on mount
+  useEffect(() => {
+    const action = searchParams.get('action')
+    const type = searchParams.get('type')
+    
+    if (action === 'signup') {
+      setOpen(true)
+      if (type === 'applicant') {
+        setAccountType('applicant')
+      }
+      setStep('account-type')
+    } else if (action === 'signin') {
+      setOpen(true)
+      setStep('signin')
+    }
+  }, [searchParams])
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -211,9 +232,88 @@ export function AuthModal({ triggerId = "open-auth" }: { triggerId?: string }) {
                 </Button>
                 <Button 
                   className="w-full bg-gradient-to-r from-[#03b2cb] to-[#00999e] hover:opacity-90 h-12"
-                  onClick={() => setStep("signup-profile")}
+                  onClick={() => setStep("account-type")}
                 >
                   Create Account
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
+          {step === "account-type" && (
+            <motion.div
+              key="account-type"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <DialogHeader>
+                <DialogTitle className="text-2xl gradient-text">Choose Account Type</DialogTitle>
+                <DialogDescription>Select what best describes you</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 mt-6">
+                <button
+                  onClick={() => {
+                    setAccountType('recruiter')
+                    setStep('signup-profile')
+                  }}
+                  className={`w-full p-6 rounded-lg border-2 transition-all hover:scale-105 ${
+                    accountType === 'recruiter'
+                      ? 'border-[#03b2cb] bg-[#03b2cb]/10'
+                      : 'border-white/10 bg-white/5'
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-r from-[#03b2cb] to-[#00999e] flex items-center justify-center">
+                      <Briefcase className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-bold text-lg">I'm a Recruiter</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Post jobs, review applications, conduct assessments
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setAccountType('applicant')
+                    toast({
+                      title: 'Coming Soon',
+                      description: 'Applicant accounts will be available soon. For now, please apply directly to job postings.',
+                    })
+                    setOpen(false)
+                  }}
+                  className={`w-full p-6 rounded-lg border-2 transition-all hover:scale-105 ${
+                    accountType === 'applicant'
+                      ? 'border-[#03b2cb] bg-[#03b2cb]/10'
+                      : 'border-white/10 bg-white/5'
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center">
+                      <User className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-bold text-lg">I'm an Applicant</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Browse jobs, apply, track applications
+                      </p>
+                      <Badge className="mt-1 bg-purple-500/20 text-purple-400 border-purple-500/40">
+                        Coming Soon
+                      </Badge>
+                    </div>
+                  </div>
+                </button>
+
+                <Button
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => setStep('choice')}
+                >
+                  ← Back
                 </Button>
               </div>
             </motion.div>

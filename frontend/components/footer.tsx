@@ -84,7 +84,9 @@ export function Footer() {
         {/* Bottom Bar */}
         <div className="pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">© 2025 RecruitAI. All rights reserved.</p>
-          <p className="text-sm text-muted-foreground">Built with ❤️ using Next.js & AI</p>
+          <p className="text-sm text-muted-foreground">
+            Built with ❤️ from <a href="https://linkedin.com/in/1davidadedeji" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#03b2cb] transition-colors">David Adedeji</a> for PLP Hackathon
+          </p>
         </div>
       </div>
     </footer>

@@ -23,6 +23,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 interface Job {
   id: string
@@ -45,6 +55,9 @@ export default function JobsPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState('all')
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [jobToDelete, setJobToDelete] = useState<Job | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -89,6 +102,49 @@ export default function JobsPage() {
       title: 'Link copied!',
       description: 'Job link copied to clipboard',
     })
+  }
+
+  const handleDeleteClick = (job: Job) => {
+    setJobToDelete(job)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!jobToDelete) return
+
+    setDeleting(true)
+    try {
+      const response = await makeAuthenticatedRequest(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/jobs/${jobToDelete.id}`,
+        { method: 'DELETE' }
+      )
+
+      if (response.ok) {
+        toast({
+          title: 'Job deleted',
+          description: 'The job posting has been successfully deleted.',
+        })
+        // Remove job from list
+        setJobs(jobs.filter(j => j.id !== jobToDelete.id))
+        setDeleteDialogOpen(false)
+        setJobToDelete(null)
+      } else {
+        const error = await response.json()
+        toast({
+          title: 'Delete failed',
+          description: error.message || 'Failed to delete job. Please try again.',
+          variant: 'destructive',
+        })
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'An error occurred while deleting the job.',
+        variant: 'destructive',
+      })
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const filteredJobs = jobs.filter(job => {
@@ -280,7 +336,10 @@ export default function JobsPage() {
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit
                               </DropdownMenuItem>
-                              <DropdownMenuItem className="text-[#e60000]">
+                              <DropdownMenuItem 
+                                className="text-[#e60000]"
+                                onClick={() => handleDeleteClick(job)}
+                              >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Delete
                               </DropdownMenuItem>
@@ -325,6 +384,29 @@ export default function JobsPage() {
           </div>
         </main>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="glass-effect border-white/10">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the job posting "{jobToDelete?.title}". 
+              All associated applications and data will be removed. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={deleting}
+              className="bg-[#e60000] hover:bg-[#cc0000]"
+            >
+              {deleting ? 'Deleting...' : 'Delete Job'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
