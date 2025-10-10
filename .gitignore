@@ -8,6 +8,17 @@ backend/node_modules/
 
 # next.js
 /.next/
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+frontend/.next/
+backend/.next/
+
+# Logs
+*.log
+
 /out/
 
 # production
