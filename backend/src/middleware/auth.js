@@ -18,15 +18,37 @@ export async function authenticate(req, res, next) {
 
     // Verify Firebase token
     const decodedToken = await firebaseAuth.verifyIdToken(token);
-    const { email, uid } = decodedToken;
+    const { email, uid, name: firebaseName } = decodedToken;
     
     // Find user in our database
-    const recruiter = await prisma.recruiter.findFirst({
-      where: { email }
+    let recruiter = await prisma.recruiter.findFirst({
+      where: { email },
+      include: { org: true }
     });
 
+    // Self-heal: If Firebase user exists but no database record, create it
     if (!recruiter) {
-      return res.status(401).json({ error: 'User not found' });
+      console.log(`[Auth] Creating missing database record for Firebase user: ${email}`);
+      const fallbackName = (firebaseName || email.split('@')[0]).trim();
+      const orgName = `${fallbackName}'s Organization`;
+      
+      const org = await prisma.org.create({
+        data: {
+          name: orgName,
+          recruiters: {
+            create: {
+              email,
+              name: fallbackName,
+              passwordHash: uid,
+              role: 'admin',
+            },
+          },
+        },
+        include: { recruiters: true },
+      });
+      
+      recruiter = org.recruiters[0];
+      recruiter.org = org;
     }
 
     req.user = {

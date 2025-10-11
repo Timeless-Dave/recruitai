@@ -12,7 +12,7 @@ const prisma = new PrismaClient();
  */
 router.get('/', authenticate, async (req, res, next) => {
   try {
-    const userId = req.user.firebaseUid;
+    const userId = req.user.id; // Use database ID instead of firebaseUid
     const { limit = 20, offset = 0, unreadOnly = false } = req.query;
 
     const where = {
@@ -50,7 +50,7 @@ router.get('/', authenticate, async (req, res, next) => {
 router.post('/:id/read', authenticate, async (req, res, next) => {
   try {
     const { id } = req.params;
-    const userId = req.user.firebaseUid;
+    const userId = req.user.id; // Use database ID instead of firebaseUid
 
     // Verify notification belongs to user
     const notification = await prisma.notification.findFirst({
@@ -79,7 +79,7 @@ router.post('/:id/read', authenticate, async (req, res, next) => {
  */
 router.post('/read-all', authenticate, async (req, res, next) => {
   try {
-    const userId = req.user.firebaseUid;
+    const userId = req.user.id; // Use database ID instead of firebaseUid
 
     const result = await prisma.notification.updateMany({
       where: { userId, isRead: false },
@@ -103,7 +103,7 @@ router.post('/read-all', authenticate, async (req, res, next) => {
 router.delete('/:id', authenticate, async (req, res, next) => {
   try {
     const { id } = req.params;
-    const userId = req.user.firebaseUid;
+    const userId = req.user.id; // Use database ID instead of firebaseUid
 
     // Verify notification belongs to user
     const notification = await prisma.notification.findFirst({
@@ -131,7 +131,7 @@ router.delete('/:id', authenticate, async (req, res, next) => {
  */
 router.delete('/', authenticate, async (req, res, next) => {
   try {
-    const userId = req.user.firebaseUid;
+    const userId = req.user.id; // Use database ID instead of firebaseUid
 
     const result = await prisma.notification.deleteMany({
       where: { userId }
