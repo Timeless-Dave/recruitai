@@ -47,7 +47,11 @@ import {
   Share2,
   ArrowRight,
   ArrowLeft,
-  Check
+  Check,
+  ClipboardList,
+  Brain,
+  BookOpen,
+  Edit3
 } from 'lucide-react'
 import { makeAuthenticatedRequest } from '@/lib/firebase'
 import { useToast } from '@/hooks/use-toast'
@@ -78,6 +82,20 @@ export default function CreateJobPage() {
   const [newSkill, setNewSkill] = useState('')
   const [aiScreening, setAiScreening] = useState(true)
   const [autoRanking, setAutoRanking] = useState(true)
+  
+  // Assessment state
+  const [assessmentEnabled, setAssessmentEnabled] = useState(false)
+  const [assessmentType, setAssessmentType] = useState<'ai-generated' | 'question-pool' | 'custom' | 'none'>('none')
+  const [questionPoolCategory, setQuestionPoolCategory] = useState('technical')
+  const [assessmentTimeLimit, setAssessmentTimeLimit] = useState('15')
+  const [assessmentPassMark, setAssessmentPassMark] = useState('60')
+  const [assessmentRequired, setAssessmentRequired] = useState(false)
+  const [customQuestions, setCustomQuestions] = useState<any[]>([])
+  const [currentQuestion, setCurrentQuestion] = useState({
+    question: '',
+    options: ['', '', '', ''],
+    correctAnswer: 0
+  })
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -97,35 +115,68 @@ export default function CreateJobPage() {
   }
 
   const handleNextStep = () => {
-    // Validate step 1 fields
-    if (!jobTitle || !location) {
+    if (currentStep === 1) {
+      // Validate step 1 fields
+      if (!jobTitle || !location) {
+        toast({
+          title: 'Missing Required Fields',
+          description: 'Please fill in Job Title and Location.',
+          variant: 'destructive',
+        })
+        return
+      }
+      setCurrentStep(2)
+    } else if (currentStep === 2) {
+      // Validate step 2 fields
+      if (!description) {
+        toast({
+          title: 'Missing Required Fields',
+          description: 'Please fill in Job Description.',
+          variant: 'destructive',
+        })
+        return
+      }
+      setCurrentStep(3)
+    }
+  }
+
+  const handlePreviousStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1)
+    }
+  }
+
+  const addCustomQuestion = () => {
+    if (!currentQuestion.question || currentQuestion.options.some(opt => !opt)) {
       toast({
-        title: 'Missing Required Fields',
-        description: 'Please fill in Job Title and Location.',
+        title: 'Incomplete Question',
+        description: 'Please fill in the question and all options.',
         variant: 'destructive',
       })
       return
     }
-    setCurrentStep(2)
+
+    setCustomQuestions([...customQuestions, {
+      id: `custom_${Date.now()}`,
+      type: 'multiple_choice',
+      category: 'custom',
+      difficulty: 'medium',
+      ...currentQuestion
+    }])
+
+    setCurrentQuestion({
+      question: '',
+      options: ['', '', '', ''],
+      correctAnswer: 0
+    })
   }
 
-  const handlePreviousStep = () => {
-    setCurrentStep(1)
+  const removeCustomQuestion = (index: number) => {
+    setCustomQuestions(customQuestions.filter((_, i) => i !== index))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    // Validate step 2 fields
-    if (!description) {
-      toast({
-        title: 'Missing Required Fields',
-        description: 'Please fill in Job Description.',
-        variant: 'destructive',
-      })
-      return
-    }
-    
     setSaving(true)
     
     try {
@@ -147,6 +198,19 @@ export default function CreateJobPage() {
           aiScreening,
           autoRanking,
         },
+        // Assessment configuration
+        assessmentType: assessmentEnabled ? assessmentType : 'none',
+        ...(assessmentEnabled && assessmentType === 'custom' && { 
+          customQuestions 
+        }),
+        ...(assessmentEnabled && assessmentType === 'question-pool' && {
+          questionPoolCategory
+        }),
+        ...(assessmentEnabled && {
+          passMark: parseInt(assessmentPassMark),
+          assessmentTimeLimit: parseInt(assessmentTimeLimit),
+          assessmentRequired
+        })
       }
 
       const response = await makeAuthenticatedRequest(
@@ -244,7 +308,7 @@ export default function CreateJobPage() {
 
               {/* Stepper */}
               <div className="mt-8 mb-6">
-                <div className="flex items-center justify-center gap-4">
+                <div className="flex items-center justify-center gap-2 sm:gap-4">
                   <div className="flex items-center">
                     <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
                       currentStep >= 1 
@@ -253,14 +317,14 @@ export default function CreateJobPage() {
                     }`}>
                       {currentStep > 1 ? <Check className="h-5 w-5" /> : '1'}
                     </div>
-                    <span className={`ml-2 text-sm font-medium ${
+                    <span className={`ml-2 text-xs sm:text-sm font-medium ${
                       currentStep >= 1 ? 'text-foreground' : 'text-muted-foreground'
                     }`}>
                       Basic Info
                     </span>
                   </div>
                   
-                  <div className={`h-0.5 w-16 ${
+                  <div className={`h-0.5 w-8 sm:w-16 ${
                     currentStep >= 2 ? 'bg-[#03b2cb]' : 'bg-white/20'
                   }`} />
                   
@@ -270,19 +334,38 @@ export default function CreateJobPage() {
                         ? 'border-[#03b2cb] bg-[#03b2cb] text-white' 
                         : 'border-white/20 text-muted-foreground'
                     }`}>
-                      2
+                      {currentStep > 2 ? <Check className="h-5 w-5" /> : '2'}
                     </div>
-                    <span className={`ml-2 text-sm font-medium ${
+                    <span className={`ml-2 text-xs sm:text-sm font-medium ${
                       currentStep >= 2 ? 'text-foreground' : 'text-muted-foreground'
                     }`}>
-                      Job Details
+                      Details
+                    </span>
+                  </div>
+
+                  <div className={`h-0.5 w-8 sm:w-16 ${
+                    currentStep >= 3 ? 'bg-[#03b2cb]' : 'bg-white/20'
+                  }`} />
+                  
+                  <div className="flex items-center">
+                    <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
+                      currentStep >= 3 
+                        ? 'border-[#03b2cb] bg-[#03b2cb] text-white' 
+                        : 'border-white/20 text-muted-foreground'
+                    }`}>
+                      3
+                    </div>
+                    <span className={`ml-2 text-xs sm:text-sm font-medium ${
+                      currentStep >= 3 ? 'text-foreground' : 'text-muted-foreground'
+                    }`}>
+                      Assessment
                     </span>
                   </div>
                 </div>
               </div>
             </motion.div>
 
-            <form onSubmit={currentStep === 1 ? (e) => { e.preventDefault(); handleNextStep(); } : handleSubmit} className="space-y-6">
+            <form onSubmit={currentStep === 3 ? handleSubmit : (e) => { e.preventDefault(); handleNextStep(); }} className="space-y-6">
               {/* Step 1: Basic Information */}
               {currentStep === 1 && (
               <Card className="glass-effect border-white/10 relative overflow-hidden">
@@ -528,6 +611,244 @@ export default function CreateJobPage() {
               </>
               )}
 
+              {/* Step 3: Assessment Configuration */}
+              {currentStep === 3 && (
+              <>
+              <Card className="glass-effect border-white/10 relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-[#03b2cb]/5 to-[#00999e]/5" />
+                <CardHeader className="relative z-10">
+                  <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                    <ClipboardList className="h-5 w-5 text-[#03b2cb]" />
+                    Assessment Configuration
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Add assessments to test candidates&apos; skills and knowledge
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-6 relative z-10">
+                  {/* Enable Assessment Toggle */}
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
+                    <div className="space-y-1 flex-1">
+                      <Label className="text-base font-medium">Enable Assessment</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Require candidates to complete an assessment
+                      </p>
+                    </div>
+                    <Switch
+                      checked={assessmentEnabled}
+                      onCheckedChange={setAssessmentEnabled}
+                    />
+                  </div>
+
+                  {assessmentEnabled && (
+                    <>
+                      {/* Assessment Type Selection */}
+                      <div className="space-y-4">
+                        <Label className="text-base font-medium">Assessment Type</Label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <button
+                            type="button"
+                            onClick={() => setAssessmentType('ai-generated')}
+                            className={`p-4 rounded-lg border-2 transition-all text-left ${
+                              assessmentType === 'ai-generated'
+                                ? 'border-[#03b2cb] bg-[#03b2cb]/10'
+                                : 'border-white/10 hover:border-[#03b2cb]/40'
+                            }`}
+                          >
+                            <Brain className="h-6 w-6 text-[#03b2cb] mb-2" />
+                            <h4 className="font-semibold mb-1">AI-Generated Questions</h4>
+                            <p className="text-sm text-muted-foreground">
+                              AI creates custom questions based on job requirements
+                            </p>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setAssessmentType('question-pool')}
+                            className={`p-4 rounded-lg border-2 transition-all text-left ${
+                              assessmentType === 'question-pool'
+                                ? 'border-[#03b2cb] bg-[#03b2cb]/10'
+                                : 'border-white/10 hover:border-[#03b2cb]/40'
+                            }`}
+                          >
+                            <BookOpen className="h-6 w-6 text-[#03b2cb] mb-2" />
+                            <h4 className="font-semibold mb-1">Pre-Built Question Pool</h4>
+                            <p className="text-sm text-muted-foreground">
+                              Use our tested questions for common roles
+                            </p>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setAssessmentType('custom')}
+                            className={`p-4 rounded-lg border-2 transition-all text-left ${
+                              assessmentType === 'custom'
+                                ? 'border-[#03b2cb] bg-[#03b2cb]/10'
+                                : 'border-white/10 hover:border-[#03b2cb]/40'
+                            }`}
+                          >
+                            <Edit3 className="h-6 w-6 text-[#03b2cb] mb-2" />
+                            <h4 className="font-semibold mb-1">Custom Questions</h4>
+                            <p className="text-sm text-muted-foreground">
+                              Create your own assessment questions
+                            </p>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Question Pool Selection */}
+                      {assessmentType === 'question-pool' && (
+                        <div className="space-y-2">
+                          <Label htmlFor="question-pool-category">Question Category</Label>
+                          <Select value={questionPoolCategory} onValueChange={setQuestionPoolCategory}>
+                            <SelectTrigger className="glass-effect border-white/10">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="glass-effect border-white/10">
+                              <SelectItem value="technical">Technical - Software Development</SelectItem>
+                              <SelectItem value="behavioral">Behavioral & Soft Skills</SelectItem>
+                              <SelectItem value="sales">Sales Professional</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            Our curated questions test essential skills for the role
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Custom Question Builder */}
+                      {assessmentType === 'custom' && (
+                        <div className="space-y-4 p-4 rounded-lg bg-white/5 border border-white/10">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-base font-medium">Custom Questions</Label>
+                            <Badge className="bg-[#03b2cb]/20 text-[#03b2cb]">
+                              {customQuestions.length} added
+                            </Badge>
+                          </div>
+
+                          {customQuestions.map((q, index) => (
+                            <div key={index} className="p-3 rounded bg-white/5 border border-white/10 flex items-start justify-between">
+                              <div className="flex-1">
+                                <p className="font-medium text-sm">{q.question}</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Correct answer: {q.options[q.correctAnswer]}
+                                </p>
+                              </div>
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => removeCustomQuestion(index)}
+                                className="h-8 w-8 text-[#e60000]"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+
+                          <Separator className="bg-white/10" />
+
+                          <div className="space-y-3">
+                            <div className="space-y-2">
+                              <Label>Question</Label>
+                              <Textarea
+                                value={currentQuestion.question}
+                                onChange={(e) => setCurrentQuestion({...currentQuestion, question: e.target.value})}
+                                placeholder="Enter your question..."
+                                className="glass-effect border-white/10"
+                              />
+                            </div>
+
+                            {currentQuestion.options.map((option, idx) => (
+                              <div key={idx} className="space-y-2">
+                                <Label>Option {idx + 1}</Label>
+                                <div className="flex gap-2">
+                                  <Input
+                                    value={option}
+                                    onChange={(e) => {
+                                      const newOptions = [...currentQuestion.options]
+                                      newOptions[idx] = e.target.value
+                                      setCurrentQuestion({...currentQuestion, options: newOptions})
+                                    }}
+                                    placeholder={`Option ${idx + 1}`}
+                                    className="glass-effect border-white/10"
+                                  />
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant={currentQuestion.correctAnswer === idx ? "default" : "outline"}
+                                    onClick={() => setCurrentQuestion({...currentQuestion, correctAnswer: idx})}
+                                    className={currentQuestion.correctAnswer === idx ? "bg-[#03b2cb]" : ""}
+                                  >
+                                    <Check className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+
+                            <Button
+                              type="button"
+                              onClick={addCustomQuestion}
+                              variant="outline"
+                              className="w-full border-[#03b2cb]/40"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add Question
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Assessment Settings */}
+                      <Separator className="bg-white/10" />
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="time-limit">Time Limit (minutes)</Label>
+                          <Input
+                            id="time-limit"
+                            type="number"
+                            value={assessmentTimeLimit}
+                            onChange={(e) => setAssessmentTimeLimit(e.target.value)}
+                            className="glass-effect border-white/10"
+                            min="5"
+                            max="120"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="pass-mark">Pass Mark (%)</Label>
+                          <Input
+                            id="pass-mark"
+                            type="number"
+                            value={assessmentPassMark}
+                            onChange={(e) => setAssessmentPassMark(e.target.value)}
+                            className="glass-effect border-white/10"
+                            min="0"
+                            max="100"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
+                        <div className="space-y-1 flex-1">
+                          <Label>Required Assessment</Label>
+                          <p className="text-sm text-muted-foreground">
+                            Candidates must complete and pass the assessment
+                          </p>
+                        </div>
+                        <Switch
+                          checked={assessmentRequired}
+                          onCheckedChange={setAssessmentRequired}
+                        />
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+              </>
+              )}
+
               {/* Navigation Buttons */}
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 {currentStep === 1 ? (
@@ -545,6 +866,25 @@ export default function CreateJobPage() {
                       className="w-full sm:flex-1 bg-gradient-to-r from-[#03b2cb] to-[#00999e] hover:opacity-90"
                     >
                       Next: Job Details
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </>
+                ) : currentStep === 2 ? (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handlePreviousStep}
+                      className="w-full sm:w-auto border-white/10 hover:bg-white/5"
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Back
+                    </Button>
+                    <Button
+                      type="submit"
+                      className="w-full sm:flex-1 bg-gradient-to-r from-[#03b2cb] to-[#00999e] hover:opacity-90"
+                    >
+                      Next: Assessment Setup
                       <ArrowRight className="h-4 w-4 ml-2" />
                     </Button>
                   </>

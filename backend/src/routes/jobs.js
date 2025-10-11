@@ -144,13 +144,16 @@ router.post(
       qualifications,
       requiredSkills,
       salary,
-      assessmentType = 'ai-generated',
+      assessmentType = 'none',
       questionPoolId,
+      questionPoolCategory,
       customQuestions,
       criteriaJson,
       weightsJson,
       applicationForm,
       passMark,
+      assessmentTimeLimit,
+      assessmentRequired,
       settings
     } = req.body;
 
@@ -199,19 +202,29 @@ router.post(
     if (assessmentType !== 'none') {
       let assessmentData = {
         jobId: job.id,
-        isRequired: false,
-        timeLimit: 15,
+        isRequired: assessmentRequired || false,
+        timeLimit: assessmentTimeLimit || 15,
         passMark: passMark || 60.0
       };
 
       if (assessmentType === 'ai-generated') {
         // Generate questions using AI
-        const questions = await assessmentService.generateQuestionsForJob(job.id);
+        const questions = await assessmentService.generateQuestionsForJob(job.id, 5, 'medium');
         assessmentData.customQuestions = questions;
-      } else if (assessmentType === 'question-pool' && questionPoolId) {
-        // Use existing question pool
-        assessmentData.questionPoolId = questionPoolId;
-      } else if (assessmentType === 'custom' && customQuestions) {
+      } else if (assessmentType === 'question-pool') {
+        // Use question pool from default pools
+        const defaultPools = assessmentService.getDefaultQuestionPools();
+        const selectedPool = defaultPools.find(pool => {
+          if (questionPoolCategory === 'technical' && pool.category === 'technical' && pool.role === 'developer') return true;
+          if (questionPoolCategory === 'behavioral' && pool.category === 'behavioral') return true;
+          if (questionPoolCategory === 'sales' && pool.role === 'sales') return true;
+          return false;
+        });
+        
+        if (selectedPool) {
+          assessmentData.customQuestions = selectedPool.questionsJson;
+        }
+      } else if (assessmentType === 'custom' && customQuestions && customQuestions.length > 0) {
         // Use custom questions
         assessmentData.customQuestions = customQuestions;
       }
