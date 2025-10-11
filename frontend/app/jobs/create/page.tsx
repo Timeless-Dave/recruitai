@@ -44,7 +44,10 @@ import {
   Sparkles,
   CheckCircle,
   Copy,
-  Share2
+  Share2,
+  ArrowRight,
+  ArrowLeft,
+  Check
 } from 'lucide-react'
 import { makeAuthenticatedRequest } from '@/lib/firebase'
 import { useToast } from '@/hooks/use-toast'
@@ -58,6 +61,7 @@ export default function CreateJobPage() {
   const [saving, setSaving] = useState(false)
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [createdJob, setCreatedJob] = useState<any>(null)
+  const [currentStep, setCurrentStep] = useState(1)
 
   // Form state
   const [jobTitle, setJobTitle] = useState('')
@@ -92,8 +96,36 @@ export default function CreateJobPage() {
     setRequiredSkills(requiredSkills.filter(s => s !== skill))
   }
 
+  const handleNextStep = () => {
+    // Validate step 1 fields
+    if (!jobTitle || !location) {
+      toast({
+        title: 'Missing Required Fields',
+        description: 'Please fill in Job Title and Location.',
+        variant: 'destructive',
+      })
+      return
+    }
+    setCurrentStep(2)
+  }
+
+  const handlePreviousStep = () => {
+    setCurrentStep(1)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validate step 2 fields
+    if (!description) {
+      toast({
+        title: 'Missing Required Fields',
+        description: 'Please fill in Job Description.',
+        variant: 'destructive',
+      })
+      return
+    }
+    
     setSaving(true)
     
     try {
@@ -209,10 +241,50 @@ export default function CreateJobPage() {
               <p className="text-sm sm:text-base text-muted-foreground">
                 Fill in the details to create a new job posting with AI-powered screening
               </p>
+
+              {/* Stepper */}
+              <div className="mt-8 mb-6">
+                <div className="flex items-center justify-center gap-4">
+                  <div className="flex items-center">
+                    <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
+                      currentStep >= 1 
+                        ? 'border-[#03b2cb] bg-[#03b2cb] text-white' 
+                        : 'border-white/20 text-muted-foreground'
+                    }`}>
+                      {currentStep > 1 ? <Check className="h-5 w-5" /> : '1'}
+                    </div>
+                    <span className={`ml-2 text-sm font-medium ${
+                      currentStep >= 1 ? 'text-foreground' : 'text-muted-foreground'
+                    }`}>
+                      Basic Info
+                    </span>
+                  </div>
+                  
+                  <div className={`h-0.5 w-16 ${
+                    currentStep >= 2 ? 'bg-[#03b2cb]' : 'bg-white/20'
+                  }`} />
+                  
+                  <div className="flex items-center">
+                    <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
+                      currentStep >= 2 
+                        ? 'border-[#03b2cb] bg-[#03b2cb] text-white' 
+                        : 'border-white/20 text-muted-foreground'
+                    }`}>
+                      2
+                    </div>
+                    <span className={`ml-2 text-sm font-medium ${
+                      currentStep >= 2 ? 'text-foreground' : 'text-muted-foreground'
+                    }`}>
+                      Job Details
+                    </span>
+                  </div>
+                </div>
+              </div>
             </motion.div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Basic Information */}
+            <form onSubmit={currentStep === 1 ? (e) => { e.preventDefault(); handleNextStep(); } : handleSubmit} className="space-y-6">
+              {/* Step 1: Basic Information */}
+              {currentStep === 1 && (
               <Card className="glass-effect border-white/10 relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-[#03b2cb]/5 to-[#00999e]/5" />
                 <CardHeader className="relative z-10">
@@ -318,8 +390,11 @@ export default function CreateJobPage() {
                   </div>
                 </CardContent>
               </Card>
+              )}
 
-              {/* Job Description */}
+              {/* Step 2: Job Details */}
+              {currentStep === 2 && (
+              <>
               <Card className="glass-effect border-white/10 relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-[#e60000]/5 to-[#ff4444]/5" />
                 <CardHeader className="relative z-10">
@@ -450,26 +525,51 @@ export default function CreateJobPage() {
                   </div>
                 </CardContent>
               </Card>
+              </>
+              )}
 
-              {/* Submit Buttons */}
+              {/* Navigation Buttons */}
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => router.push('/jobs')}
-                  className="w-full sm:w-auto border-white/10 hover:bg-white/5"
-                  disabled={saving}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={saving}
-                  className="w-full sm:flex-1 bg-gradient-to-r from-[#03b2cb] to-[#00999e] hover:opacity-90"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  {saving ? 'Creating Job...' : 'Create Job Posting'}
-                </Button>
+                {currentStep === 1 ? (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => router.push('/jobs')}
+                      className="w-full sm:w-auto border-white/10 hover:bg-white/5"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      className="w-full sm:flex-1 bg-gradient-to-r from-[#03b2cb] to-[#00999e] hover:opacity-90"
+                    >
+                      Next: Job Details
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handlePreviousStep}
+                      className="w-full sm:w-auto border-white/10 hover:bg-white/5"
+                      disabled={saving}
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Back
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={saving}
+                      className="w-full sm:flex-1 bg-gradient-to-r from-[#03b2cb] to-[#00999e] hover:opacity-90"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      {saving ? 'Creating Job...' : 'Create Job Posting'}
+                    </Button>
+                  </>
+                )}
               </div>
             </form>
           </div>

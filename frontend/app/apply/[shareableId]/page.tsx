@@ -166,11 +166,13 @@ export default function ApplyJobPage() {
     }
   }
 
-  const getTypeLabel = (type: string) => {
+  const getTypeLabel = (type: string | null | undefined) => {
+    if (!type) return 'Not specified'
     return type.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
   }
 
-  const getExperienceLabel = (level: string) => {
+  const getExperienceLabel = (level: string | null | undefined) => {
+    if (!level) return 'Not specified'
     const labels: Record<string, string> = {
       'entry': 'Entry Level',
       'mid': 'Mid Level',

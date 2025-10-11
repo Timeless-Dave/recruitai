@@ -137,7 +137,11 @@ export function RecruiterDashboard() {
                 View All →
               </Button>
             </div>
-            <JobsTable jobs={dashboardData?.recentJobs || []} loading={loading} />
+            <JobsTable 
+              jobs={dashboardData?.recentJobs || []} 
+              loading={loading}
+              onJobDeleted={fetchDashboardData}
+            />
           </motion.div>
         </div>
       </main>

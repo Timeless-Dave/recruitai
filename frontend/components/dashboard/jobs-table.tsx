@@ -1,18 +1,32 @@
 "use client"
 
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Eye, Users, Calendar, MoreVertical } from 'lucide-react'
+import { Eye, Users, Calendar, MoreVertical, Trash2 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useRouter } from 'next/navigation'
+import { useToast } from '@/hooks/use-toast'
+import { makeAuthenticatedRequest } from '@/lib/firebase'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 interface Job {
   id: string
@@ -26,10 +40,15 @@ interface Job {
 interface JobsTableProps {
   jobs: Job[]
   loading: boolean
+  onJobDeleted?: () => void
 }
 
-export function JobsTable({ jobs, loading }: JobsTableProps) {
+export function JobsTable({ jobs, loading, onJobDeleted }: JobsTableProps) {
   const router = useRouter()
+  const { toast } = useToast()
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [jobToDelete, setJobToDelete] = useState<Job | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   if (loading) {
     return (
@@ -82,6 +101,83 @@ export function JobsTable({ jobs, loading }: JobsTableProps) {
         return 'bg-yellow-500/20 text-yellow-500 border-yellow-500/40'
       default:
         return 'bg-muted/20 text-muted-foreground border-muted'
+    }
+  }
+
+  const handleDeleteClick = (job: Job) => {
+    setJobToDelete(job)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!jobToDelete) return
+    
+    setDeleting(true)
+    try {
+      const response = await makeAuthenticatedRequest(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/jobs/${jobToDelete.id}`,
+        {
+          method: 'DELETE',
+        }
+      )
+
+      if (response.ok) {
+        toast({
+          title: 'Job deleted',
+          description: 'The job posting has been successfully deleted.',
+        })
+        setDeleteDialogOpen(false)
+        setJobToDelete(null)
+        // Trigger refresh
+        if (onJobDeleted) {
+          onJobDeleted()
+        }
+      } else {
+        throw new Error('Failed to delete job')
+      }
+    } catch (error) {
+      console.error('Failed to delete job:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to delete job. Please try again.',
+        variant: 'destructive',
+      })
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const handleCloseJob = async (job: Job) => {
+    try {
+      const response = await makeAuthenticatedRequest(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/jobs/${job.id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ status: 'closed' }),
+        }
+      )
+
+      if (response.ok) {
+        toast({
+          title: 'Job closed',
+          description: 'The job posting is now closed.',
+        })
+        if (onJobDeleted) {
+          onJobDeleted()
+        }
+      } else {
+        throw new Error('Failed to close job')
+      }
+    } catch (error) {
+      console.error('Failed to close job:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to close job. Please try again.',
+        variant: 'destructive',
+      })
     }
   }
 
@@ -150,8 +246,19 @@ export function JobsTable({ jobs, loading }: JobsTableProps) {
                       <DropdownMenuItem onClick={() => router.push(`/jobs/${job.id}/analytics`)}>
                         Analytics
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-[#e60000]">
+                      <DropdownMenuSeparator className="bg-white/10" />
+                      <DropdownMenuItem 
+                        onClick={() => handleCloseJob(job)}
+                        className="text-yellow-500"
+                      >
                         Close Job
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => handleDeleteClick(job)}
+                        className="text-[#e60000] focus:text-[#e60000]"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Job
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -161,6 +268,29 @@ export function JobsTable({ jobs, loading }: JobsTableProps) {
           </Card>
         </motion.div>
       ))}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="glass-effect border-white/10">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Job Posting?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{jobToDelete?.title}"? This action cannot be undone 
+              and will permanently delete all associated applicants and data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={deleting}
+              className="bg-[#e60000] hover:bg-[#cc0000]"
+            >
+              {deleting ? 'Deleting...' : 'Delete Job'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

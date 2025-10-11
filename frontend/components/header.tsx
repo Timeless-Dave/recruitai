@@ -25,22 +25,31 @@ export function Header() {
     let animation: any
     let mounted = true
     ;(async () => {
-      const mod: any = await import("animejs")
-      if (!mounted || !badgeRef.current) return
-      const anime = (mod && (mod.default || (mod.anime ?? mod))) as any
-      animation = anime({
-        targets: badgeRef.current,
-        scale: [1, 1.05, 1],
-        translateY: [0, -1, 0],
-        boxShadow: [
-          "0 0 0px rgba(3,178,203,0.0)",
-          "0 8px 24px rgba(3,178,203,0.15)",
-          "0 0 0px rgba(3,178,203,0.0)",
-        ],
-        duration: 2500,
-        easing: "easeInOutSine",
-        loop: true,
-      })
+      try {
+        const animeModule = await import("animejs") as any
+        if (!mounted || !badgeRef.current) return
+        // animejs v4 may export differently, try multiple patterns
+        const anime = animeModule?.default || animeModule?.anime || animeModule
+        if (typeof anime !== 'function') {
+          console.warn('anime is not a function:', typeof anime)
+          return
+        }
+        animation = anime({
+          targets: badgeRef.current,
+          scale: [1, 1.05, 1],
+          translateY: [0, -1, 0],
+          boxShadow: [
+            "0 0 0px rgba(3,178,203,0.0)",
+            "0 8px 24px rgba(3,178,203,0.15)",
+            "0 0 0px rgba(3,178,203,0.0)",
+          ],
+          duration: 2500,
+          easing: "easeInOutSine",
+          loop: true,
+        })
+      } catch (error) {
+        console.error('Failed to load animejs:', error)
+      }
     })()
     return () => {
       mounted = false

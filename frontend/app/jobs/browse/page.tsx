@@ -35,9 +35,9 @@ interface PublicJob {
   title: string
   description: string
   location: string
-  type: string
-  experienceLevel: string
-  department?: string
+  type: string | null
+  experienceLevel: string | null
+  department?: string | null
   shareableUrl: string
   createdAt: string
   _count: {
@@ -79,11 +79,13 @@ export default function BrowseJobsPage() {
     }
   }
 
-  const getTypeLabel = (type: string) => {
+  const getTypeLabel = (type: string | null | undefined) => {
+    if (!type) return 'Not specified'
     return type.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
   }
 
-  const getExperienceLabel = (level: string) => {
+  const getExperienceLabel = (level: string | null | undefined) => {
+    if (!level) return 'Not specified'
     const labels: Record<string, string> = {
       'entry': 'Entry Level',
       'mid': 'Mid Level',
